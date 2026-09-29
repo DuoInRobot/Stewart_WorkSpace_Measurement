@@ -91,7 +91,7 @@ def test_readme_documents_reproduction_metrics_and_split_limitation():
         "python3 src/train_boundary_radius_nn_model.py",
         "14,366",
         "4,788",
-        "双侧 5 mm 边界准确率",
+        "边界准确率",
         "整体准确率",
         "行级随机划分",
         "MIT",
@@ -114,3 +114,6 @@ def test_readme_documents_reproduction_metrics_and_split_limitation():
         text = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
         assert removed_en not in text
         assert removed_zh not in text
+        assert ("双侧 " + "5 mm 边界准确率") not in text
+        assert ("误差不超过 " + "1、2、5 mm 的比例") not in text
+        assert "边界绝对误差：" not in text

@@ -33,6 +33,20 @@ def test_published_model_reproduces_published_json_metrics():
     assert f"{removed_prefix}_within_5mm_ratio" not in metrics["test"]["boundary"]
 
 
+def test_public_markdown_uses_generic_boundary_accuracy_wording():
+    summary = json.loads(
+        (REPOSITORY_ROOT / "reports" / "accuracy_report.json").read_text(encoding="utf-8")
+    )
+    rendered = trainer.render_report(summary)
+    published = (REPOSITORY_ROOT / "reports" / "accuracy_report.md").read_text(encoding="utf-8")
+
+    assert rendered == published
+    assert "边界准确率" in rendered
+    assert "边界绝对误差：" not in rendered
+    assert ("双侧 " + "5 mm 边界准确率") not in rendered
+    assert ("双侧 " + "5 mm 内的边界点数") not in rendered
+
+
 def test_artifact_verification_rejects_changed_metrics(tmp_path):
     summary = json.loads(
         (REPOSITORY_ROOT / "reports" / "accuracy_report.json").read_text(encoding="utf-8")
