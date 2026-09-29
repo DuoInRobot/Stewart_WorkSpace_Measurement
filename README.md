@@ -64,6 +64,74 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
+## 数据采集 Demo
+
+三个公开采集入口位于 `src/`，生成的原始文件默认写入 `data/raw/`。安装 RealSense 和 ArUco 采集依赖：
+
+```bash
+python3 -m pip install -r requirements-collection.txt
+```
+
+`opencv-contrib-python` 提供 ArUco 模块，`pyrealsense2` 提供 Intel RealSense Python 接口。力传感器驱动不随本仓库发布；需要真实机器人模式时，另行安装 [xArm Python SDK](https://github.com/xArm-Developer/xArm-Python-SDK)：
+
+```bash
+python3 -m pip install xarm-python-sdk
+```
+
+### 1. 手动姿态采集
+
+只采集 RealSense/ArUco 姿态：
+
+```bash
+python3 src/manual_base_measurement.py
+```
+
+连接外部力传感器驱动时：
+
+```bash
+python3 src/manual_base_measurement.py \
+  --force-sensor-python-dir /path/to/force-sensor-driver
+```
+
+采集窗口按键为：`r` 标记零位参考、`i` 标记内部点、`b` 标记边界点、`u` 标记未知、`n` 开始新轨迹、`q` 或 `Esc` 结束。
+
+### 2. 边界模型实时采集
+
+使用公开 NPZ 模型显示当前姿态与预测边界，并在网页中设置零位、标记边界或连续采样：
+
+```bash
+python3 src/boundary_model_live_ui.py \
+  --model models/boundary_radius_nn_model.npz
+```
+
+默认网页地址为 `http://127.0.0.1:8093`。
+
+### 3. 力反馈边界采集
+
+无硬件 mock 演示：
+
+```bash
+python3 src/force_boundary_ui.py --mock
+```
+
+默认网页地址为 `http://127.0.0.1:8765`。真实模式同时需要 RealSense、xArm 和外部力传感器驱动，并要求显式提供设备参数：
+
+```bash
+python3 src/force_boundary_ui.py \
+  --robot-ip ROBOT_IP \
+  --force-sensor-python-dir /path/to/force-sensor-driver
+```
+
+请先完成机器人运动安全评估，再启用真实运动控制。程序中的力和力矩限制不能替代硬件急停、限位与现场风险控制。
+
+### 数据流与隐私
+
+```text
+采集 Demo -> data/raw -> 清洗与预处理 -> 固定公开数据集 -> 训练/验证
+```
+
+`data/raw/` 中的 CSV 可能包含实验时间、设备或标记信息、原始相机姿态、机器人姿态以及力/力矩测量。该目录中的生成文件默认被 Git 忽略；公开任何原始文件前必须进行字段审查和脱敏。当前 `data/*.csv` 是已经清洗并固定划分的公开训练、验证和测试数据，不应直接用新采集文件覆盖。
+
 使用固定配置重新训练并生成模型和报告：
 
 ```bash

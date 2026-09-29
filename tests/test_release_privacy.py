@@ -42,6 +42,12 @@ def test_release_metadata_and_documentation_exist():
         "models/boundary_radius_nn_model.npz",
         "reports/accuracy_report.json",
         "reports/accuracy_report.md",
+        "src/arudo_detector.py",
+        "src/manual_base_measurement.py",
+        "src/boundary_model_live_ui.py",
+        "src/force_boundary_ui.py",
+        "requirements-collection.txt",
+        "data/raw/README.md",
     ):
         assert (REPOSITORY_ROOT / relative_path).is_file(), relative_path
 
@@ -61,8 +67,10 @@ def test_report_paths_are_relative_and_release_has_no_local_absolute_paths():
             assert not Path(value).is_absolute(), value
 
     local_home_marker = "/" + "home" + "/"
-    drive_path = re.compile(r"[A-Za-z]:[\\/]")
+    drive_path = re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]")
     original_name_marker = "manual_base_samples_" + "2026"
+    fixed_robot_ip = "192.168." + "1.241"
+    workspace_import = "WorkSpace" + "Measurement."
     suffixes = {".csv", ".json", ".md", ".py", ".txt"}
     for path in REPOSITORY_ROOT.rglob("*"):
         if not path.is_file() or {"__pycache__", ".pytest_cache"} & set(path.parts):
@@ -73,6 +81,8 @@ def test_report_paths_are_relative_and_release_has_no_local_absolute_paths():
         assert local_home_marker not in text, path
         assert not drive_path.search(text), path
         assert original_name_marker not in text, path
+        assert fixed_robot_ip not in text, path
+        assert workspace_import not in text, path
 
 
 def test_readme_documents_reproduction_metrics_and_split_limitation():
@@ -85,6 +95,11 @@ def test_readme_documents_reproduction_metrics_and_split_limitation():
         "整体准确率",
         "行级随机划分",
         "MIT",
+        "数据采集 Demo",
+        "python3 src/manual_base_measurement.py",
+        "python3 src/boundary_model_live_ui.py",
+        "python3 src/force_boundary_ui.py --mock",
+        "data/raw",
     ):
         assert phrase in readme
     removed_zh = "保守" + "边界"
