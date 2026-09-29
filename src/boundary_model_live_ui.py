@@ -438,6 +438,7 @@ class LiveBoundaryState:
         self._latest_marker: Optional[LiveMarkerPose] = None
         self._zero_pose: Optional[Pose6] = None
         self._latest_frame_jpeg: Optional[bytes] = None
+        self._camera_error: Optional[str] = None
         self._stats = {"inside": 0, "near_boundary": 0, "not_ready": 0}
         self._manual_boundary_sampling_enabled = False
         self._last_manual_boundary_sample_time_s: Optional[float] = None
@@ -449,6 +450,10 @@ class LiveBoundaryState:
     def update_frame(self, frame_jpeg: Optional[bytes]) -> None:
         with self._lock:
             self._latest_frame_jpeg = frame_jpeg
+
+    def update_camera_error(self, error: Optional[str]) -> None:
+        with self._lock:
+            self._camera_error = error
 
     def latest_frame(self) -> Optional[bytes]:
         with self._lock:
@@ -523,6 +528,7 @@ class LiveBoundaryState:
             marker = self._latest_marker
             zero_pose = self._zero_pose
             stats = dict(self._stats)
+            camera_error = self._camera_error
 
         payload = {
             "timestamp_s": timestamp_s,
@@ -534,6 +540,7 @@ class LiveBoundaryState:
             "upper_radius_mm": self.upper_radius_mm,
             "model_type": getattr(self.model, "model_type", "unknown"),
             "status": "not_ready",
+            "camera_error": camera_error,
             "camera_in_marker": None,
             "relative": None,
             "q": None,
@@ -690,8 +697,25 @@ class CameraPoller:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._camera = None
+        self._detector = None
 
     def start(self) -> None:
+        from arudo_detector import ArUcoDetector, RealSenseColorCamera
+
+        camera = RealSenseColorCamera(width=self.width, height=self.height, fps=self.fps, serial=self.serial)
+        try:
+            intrinsics = camera.start()
+            detector = ArUcoDetector(
+                intrinsics=intrinsics,
+                marker_size=self.marker_size,
+                dictionary_id=self.dictionary,
+            )
+        except Exception:
+            camera.stop()
+            raise
+        self._camera = camera
+        self._detector = detector
+        self.state.update_camera_error(None)
         self._thread = threading.Thread(target=self._run, name="boundary-model-camera", daemon=True)
         self._thread.start()
 
@@ -701,42 +725,44 @@ class CameraPoller:
             self._thread.join(timeout=2.0)
         if self._camera is not None:
             self._camera.stop()
+            self._camera = None
+        self._detector = None
 
     def _run(self) -> None:
-        from arudo_detector import ArUcoDetector, RealSenseColorCamera
-
-        self._camera = RealSenseColorCamera(width=self.width, height=self.height, fps=self.fps, serial=self.serial)
-        intrinsics = self._camera.start()
-        detector = ArUcoDetector(intrinsics=intrinsics, marker_size=self.marker_size, dictionary_id=self.dictionary)
-        while not self._stop_event.is_set():
-            frame = self._camera.read()
-            detections = detector.detect(frame)
-            selected = _select_detection(detections, self.marker_id)
-            marker_pose = None
-            if selected is not None:
-                detected_id, (rvec, tvec, reproj_error_px, _corners) = selected
-                marker_pose = LiveMarkerPose(
-                    timestamp_s=time.time(),
-                    marker_id=int(detected_id),
-                    camera_in_marker=invert_marker_pose_to_camera_pose(rvec, tvec),
-                    reproj_error_px=float(reproj_error_px),
+        try:
+            while not self._stop_event.is_set():
+                frame = self._camera.read()
+                detections = self._detector.detect(frame)
+                selected = _select_detection(detections, self.marker_id)
+                marker_pose = None
+                if selected is not None:
+                    detected_id, (rvec, tvec, reproj_error_px, _corners) = selected
+                    marker_pose = LiveMarkerPose(
+                        timestamp_s=time.time(),
+                        marker_id=int(detected_id),
+                        camera_in_marker=invert_marker_pose_to_camera_pose(rvec, tvec),
+                        reproj_error_px=float(reproj_error_px),
+                    )
+                self.state.update_marker(marker_pose)
+                image = self._detector.draw(frame, detections)
+                payload = self.state.status_payload()
+                cv2.putText(
+                    image,
+                    f"{payload['status']} margin={payload['radius_margin_mm']}",
+                    (10, 24),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 255, 0) if payload["status"] == "inside" else (0, 200, 255),
+                    2,
+                    cv2.LINE_AA,
                 )
-            self.state.update_marker(marker_pose)
-            image = detector.draw(frame, detections)
-            payload = self.state.status_payload()
-            cv2.putText(
-                image,
-                f"{payload['status']} margin={payload['radius_margin_mm']}",
-                (10, 24),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0, 255, 0) if payload["status"] == "inside" else (0, 200, 255),
-                2,
-                cv2.LINE_AA,
-            )
-            ok, encoded = cv2.imencode(".jpg", image)
-            if ok:
-                self.state.update_frame(bytes(encoded))
+                ok, encoded = cv2.imencode(".jpg", image)
+                if ok:
+                    self.state.update_frame(bytes(encoded))
+        except Exception as exc:
+            self.state.update_marker(None)
+            self.state.update_camera_error(str(exc))
+            self._stop_event.set()
 
 
 INDEX_HTML = """<!doctype html>
@@ -939,17 +965,18 @@ def run_live_ui(args: argparse.Namespace) -> int:
         serial=args.serial,
         dictionary=args.dictionary,
     )
-    poller.start()
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state))
-    print(f"Boundary model live UI: http://{args.host}:{args.port}")
-    print(f"Model: {args.model} ({model.model_type})")
-    print("Place Stewart at zero pose, then click Set Zero in the UI.")
-    print(f"Outside candidates: {args.outside_log}")
-    print(f"Manual boundary marks: {args.manual_boundary_log}")
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        poller.start()
+        print(f"Boundary model live UI: http://{args.host}:{args.port}")
+        print(f"Model: {args.model} ({model.model_type})")
+        print("Place Stewart at zero pose, then click Set Zero in the UI.")
+        print(f"Outside candidates: {args.outside_log}")
+        print(f"Manual boundary marks: {args.manual_boundary_log}")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
     finally:
         server.server_close()
         poller.stop()

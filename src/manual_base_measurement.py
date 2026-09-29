@@ -21,9 +21,6 @@ import numpy as np
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RAW_DIR = REPOSITORY_ROOT / "data" / "raw"
 
-from arudo_detector import ArUcoDetector, RealSenseColorCamera  # noqa: E402
-
-
 @dataclass(frozen=True)
 class WrenchSample:
     force_n: tuple[float, float, float]
@@ -636,6 +633,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def run_manual_base_measurement(args: argparse.Namespace) -> int:
+    from arudo_detector import ArUcoDetector, RealSenseColorCamera
+
     output_path = Path(args.output) if args.output else default_output_path()
     camera = None
     force_reader = None

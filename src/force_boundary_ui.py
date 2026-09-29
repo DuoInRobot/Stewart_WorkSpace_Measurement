@@ -27,7 +27,6 @@ from manual_base_measurement import (
     camera_pose_from_marker_pose,
     select_detection,
 )
-from arudo_detector import ArUcoDetector, RealSenseColorCamera  # noqa: E402
 
 CSV_FIELDS = [
     "mark_index",
@@ -435,6 +434,7 @@ class SensorRobotSource:
                 sys.path.insert(0, str(module_path))
 
         import force_sensor
+        from arudo_detector import ArUcoDetector, RealSenseColorCamera
         from xarm.wrapper import XArmAPI
 
         sensor = None
@@ -1352,20 +1352,19 @@ def main() -> int:
         jog_force_limit_n=args.jog_force_limit,
         jog_torque_limit_nm=args.jog_torque_limit,
     )
-    poller.start()
-
     server = ThreadingHTTPServer((args.host, args.port), make_handler(poller, recorder))
-    url = f"http://{args.host}:{args.port}"
-    print(f"force boundary UI running: {url}")
-    print(f"manual marks CSV: {Path(args.output)}")
-    print("press Ctrl+C to stop")
 
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("stopping")
+        poller.start()
+        url = f"http://{args.host}:{args.port}"
+        print(f"force boundary UI running: {url}")
+        print(f"manual marks CSV: {Path(args.output)}")
+        print("press Ctrl+C to stop")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("stopping")
     finally:
-        server.shutdown()
         server.server_close()
         poller.stop()
     return 0

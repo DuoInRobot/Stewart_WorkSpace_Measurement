@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import subprocess
 import sys
+import time
+import types
 
 import numpy as np
 import pytest
@@ -82,3 +85,185 @@ def test_force_ui_real_mode_requires_explicit_hardware_configuration():
     args = module.build_arg_parser().parse_args([])
     with pytest.raises(ValueError, match="--robot-ip"):
         module.validate_hardware_args(args)
+
+
+def test_force_ui_mock_mode_does_not_attempt_hardware_imports():
+    script = f"""
+import sys
+
+attempted = []
+
+class BlockHardwareImports:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {{'pyrealsense2', 'xarm', 'force_sensor'}}:
+            attempted.append(fullname)
+            raise ImportError(f'blocked hardware import: {{fullname}}')
+        return None
+
+sys.meta_path.insert(0, BlockHardwareImports())
+sys.path.insert(0, {str(SRC_DIR)!r})
+import force_boundary_ui
+
+args = force_boundary_ui.build_arg_parser().parse_args(['--mock'])
+source = force_boundary_ui.build_source(args)
+source.start()
+source.read()
+source.stop()
+if attempted:
+    raise SystemExit('hardware imports attempted: ' + ', '.join(attempted))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        env={"PYTHONDONTWRITEBYTECODE": "1"},
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_boundary_camera_startup_error_is_propagated(monkeypatch):
+    module = load_source_module("boundary_model_live_ui")
+
+    class FailingCamera:
+        def __init__(self, **_kwargs):
+            pass
+
+        def start(self):
+            raise RuntimeError("camera unavailable")
+
+        def stop(self):
+            pass
+
+    fake_arudo = types.SimpleNamespace(
+        RealSenseColorCamera=FailingCamera,
+        ArUcoDetector=object,
+    )
+    monkeypatch.setitem(sys.modules, "arudo_detector", fake_arudo)
+    state = module.LiveBoundaryState(model=types.SimpleNamespace(model_type="stub"))
+    poller = module.CameraPoller(
+        state=state,
+        marker_id=2,
+        marker_size=0.03,
+        width=640,
+        height=480,
+        fps=30,
+        serial=None,
+        dictionary=0,
+    )
+
+    with pytest.raises(RuntimeError, match="camera unavailable"):
+        poller.start()
+
+
+def test_boundary_camera_capture_error_is_visible_in_status(monkeypatch):
+    module = load_source_module("boundary_model_live_ui")
+
+    class FailingCamera:
+        def __init__(self, **_kwargs):
+            self.stopped = False
+
+        def start(self):
+            return object()
+
+        def read(self):
+            raise RuntimeError("camera disconnected")
+
+        def stop(self):
+            self.stopped = True
+
+    class FakeDetector:
+        def __init__(self, **_kwargs):
+            pass
+
+    monkeypatch.setitem(
+        sys.modules,
+        "arudo_detector",
+        types.SimpleNamespace(RealSenseColorCamera=FailingCamera, ArUcoDetector=FakeDetector),
+    )
+    state = module.LiveBoundaryState(model=types.SimpleNamespace(model_type="stub"))
+    poller = module.CameraPoller(
+        state=state,
+        marker_id=2,
+        marker_size=0.03,
+        width=640,
+        height=480,
+        fps=30,
+        serial=None,
+        dictionary=0,
+    )
+    poller.start()
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        if state.status_payload().get("camera_error"):
+            break
+        time.sleep(0.01)
+    poller.stop()
+
+    assert state.status_payload()["camera_error"] == "camera disconnected"
+
+
+def test_boundary_ui_binds_server_before_starting_camera(monkeypatch, tmp_path):
+    module = load_source_module("boundary_model_live_ui")
+    starts = []
+
+    class FakePoller:
+        def __init__(self, **_kwargs):
+            pass
+
+        def start(self):
+            starts.append(True)
+
+        def stop(self):
+            pass
+
+    def fail_bind(*_args, **_kwargs):
+        raise OSError("port unavailable")
+
+    monkeypatch.setattr(module, "CameraPoller", FakePoller)
+    monkeypatch.setattr(module, "ThreadingHTTPServer", fail_bind)
+    args = module.build_arg_parser().parse_args(
+        [
+            "--outside-log", str(tmp_path / "outside.csv"),
+            "--manual-boundary-log", str(tmp_path / "manual.csv"),
+        ]
+    )
+
+    with pytest.raises(OSError, match="port unavailable"):
+        module.run_live_ui(args)
+    assert starts == []
+
+
+def test_force_ui_binds_server_before_starting_source(monkeypatch, tmp_path):
+    module = load_source_module("force_boundary_ui")
+    starts = []
+
+    class FakePoller:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def start(self):
+            starts.append(True)
+
+        def stop(self):
+            pass
+
+    real_build_arg_parser = module.build_arg_parser
+
+    class FakeParser:
+        def parse_args(self):
+            return real_build_arg_parser().parse_args(
+                ["--mock", "--output", str(tmp_path / "marks.csv")]
+            )
+
+    def fail_bind(*_args, **_kwargs):
+        raise OSError("port unavailable")
+
+    monkeypatch.setattr(module, "SamplePoller", FakePoller)
+    monkeypatch.setattr(module, "ThreadingHTTPServer", fail_bind)
+    monkeypatch.setattr(module, "build_arg_parser", lambda: FakeParser())
+
+    with pytest.raises(OSError, match="port unavailable"):
+        module.main()
+    assert starts == []
