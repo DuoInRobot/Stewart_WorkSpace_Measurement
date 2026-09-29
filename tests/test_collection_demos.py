@@ -64,3 +64,21 @@ def test_live_boundary_ui_loads_published_npz_and_uses_raw_outputs():
     prediction = model.predict(np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
     assert prediction.radius_mm > 0.0
     assert model.model_type == "nn"
+
+
+def test_force_ui_mock_mode_has_no_device_defaults():
+    module = load_source_module("force_boundary_ui")
+    args = module.build_arg_parser().parse_args(["--mock"])
+    assert args.robot_ip is None
+    assert args.force_sensor_python_dir is None
+    source = module.build_source(args)
+    assert isinstance(source, module.MockSource)
+    sample = source.read()
+    assert len(sample.wrench.force_n) == 3
+
+
+def test_force_ui_real_mode_requires_explicit_hardware_configuration():
+    module = load_source_module("force_boundary_ui")
+    args = module.build_arg_parser().parse_args([])
+    with pytest.raises(ValueError, match="--robot-ip"):
+        module.validate_hardware_args(args)
