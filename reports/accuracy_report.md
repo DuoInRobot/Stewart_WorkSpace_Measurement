@@ -1,3 +1,78 @@
+# Stewart Workspace Boundary Neural Network Accuracy Report
+
+## Fixed Dataset Split
+
+| Dataset | Total Samples | Boundary Samples | Interior Samples |
+|---|---:|---:|---:|
+| Training Set | 14,366 | 8,521 | 5,845 |
+| Validation Set | 4,788 | 2,840 | 1,948 |
+| Test Set (Primary Generalization Results) | 4,788 | 2,840 | 1,948 |
+
+## Evaluation Metrics
+
+- **Correct boundary sample:** Determined according to the boundary classification rule of the released model.
+- **Correct interior sample:** `Predicted boundary radius >= Interior sample radius`.
+- **Overall accuracy:** `(Number of correct boundary samples + Number of correct interior samples) / Total number of samples`.
+
+## Results
+
+### Training Set
+
+- Mean combined loss: `3.006027`
+- Boundary MAE: `2.3332 mm`
+- Boundary RMSE: `3.1608 mm`
+- Median signed residual: `-1.2164 mm`
+- 95th percentile absolute residual (P95): `5.5223 mm`
+- Boundary accuracy: `92.55%` (`7,886/8,521`)
+- Interior sample Inside accuracy: `98.56%` (`5,761/5,845`)
+- Interior sample Outside misclassification rate: `1.44%` (`84/5,845`)
+- 1 mm safety margin satisfaction rate: `97.95%`
+- Interior sample margin:
+  - Minimum: `-10.7069 mm`
+  - P05: `3.7315 mm`
+  - Median: `17.2229 mm`
+  - P95: `38.9438 mm`
+  - Maximum: `58.5214 mm`
+- Overall accuracy: `95.00%`
+
+### Validation Set
+
+- Mean combined loss: `2.749038`
+- Boundary MAE: `2.3739 mm`
+- Boundary RMSE: `3.0277 mm`
+- Median signed residual: `-1.4066 mm`
+- 95th percentile absolute residual (P95): `5.6203 mm`
+- Boundary accuracy: `91.48%` (`2,598/2,840`)
+- Interior sample Inside accuracy: `98.87%` (`1,926/1,948`)
+- Interior sample Outside misclassification rate: `1.13%` (`22/1,948`)
+- 1 mm safety margin satisfaction rate: `98.20%`
+- Interior sample margin:
+  - Minimum: `-8.4216 mm`
+  - P05: `3.3598 mm`
+  - Median: `16.8657 mm`
+  - P95: `38.8369 mm`
+  - Maximum: `58.7668 mm`
+- Overall accuracy: `94.49%`
+
+### Test Set (Primary Generalization Results)
+
+- Mean combined loss: `3.000196`
+- Boundary MAE: `2.3587 mm`
+- Boundary RMSE: `3.1621 mm`
+- Median signed residual: `-1.3360 mm`
+- 95th percentile absolute residual (P95): `5.6132 mm`
+- Boundary accuracy: `92.85%` (`2,637/2,840`)
+- Interior sample Inside accuracy: `99.13%` (`1,931/1,948`)
+- Interior sample Outside misclassification rate: `0.87%` (`17/1,948`)
+- 1 mm safety margin satisfaction rate: `98.31%`
+- Interior sample margin:
+  - Minimum: `-12.0500 mm`
+  - P05: `3.5639 mm`
+  - Median: `16.7373 mm`
+  - P95: `39.5061 mm`
+  - Maximum: `58.2492 mm`
+- Overall accuracy: `95.41%`
+
 # Stewart 边界神经网络准确度报告
 
 ## 固定数据划分
@@ -8,7 +83,6 @@
 | 验证集 | 4,788 | 2,840 | 1,948 |
 | 测试集（主要泛化结果） | 4,788 | 2,840 | 1,948 |
 
-> 局限性：采用行级随机划分，相邻或重复的特征/目标观测可能跨集合，因此指标可能偏乐观。
 
 ## 指标定义
 
