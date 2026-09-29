@@ -91,17 +91,25 @@ def test_readme_documents_reproduction_metrics_and_split_limitation():
         "python3 src/train_boundary_radius_nn_model.py",
         "14,366",
         "4,788",
-        "边界准确率",
-        "整体准确率",
-        "行级随机划分",
+        "Boundary accuracy",
+        "Overall accuracy",
+        "row-level stratified random split",
         "MIT",
-        "数据采集 Demo",
+        "Data Collection Demos",
         "python3 src/manual_base_measurement.py",
         "python3 src/boundary_model_live_ui.py",
         "python3 src/force_boundary_ui.py --mock",
         "data/raw",
+        'src="CAD/装配体.jpg"',
+        'alt="Stewart platform assembly"',
     ):
         assert phrase in readme
+    readme_without_image_path = readme.replace("CAD/装配体.jpg", "CAD/assembly.jpg")
+    assert re.search(r"[\u4e00-\u9fff]", readme_without_image_path) is None
+
+    cad_dir = REPOSITORY_ROOT / "CAD"
+    assert (cad_dir / "装配体.jpg").is_file()
+    assert len(list(cad_dir.glob("*.STL"))) == 45
     removed_zh = "保守" + "边界"
     removed_en = "conser" + "vative"
     assert f"{removed_zh}准确率" not in readme

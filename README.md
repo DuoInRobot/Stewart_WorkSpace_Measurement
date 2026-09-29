@@ -1,62 +1,66 @@
 # Stewart Boundary Radius Neural Network
 
-本仓库使用六维等效姿态方向预测 Stewart 机构的工作空间边界半径，并提供经过清洗的固定训练集、验证集和测试集。
+This repository predicts the workspace boundary radius of a Stewart platform from a six-dimensional equivalent-pose direction. It includes sanitized, fixed training, validation, and test datasets.
 
-## 数据隐私与范围
+<p align="center">
+  <img src="CAD/装配体.jpg" alt="Stewart platform assembly" width="720">
+</p>
 
-公开数据从模型就绪的六维特征数据导出，不包含采集时间、设备或标记信息、原始相机姿态、力/力矩数据、本机文件路径以及原始样本标识。所有公开 CSV 仅包含训练、验证和解释模型所需的 15 个字段。
+## Data Privacy and Scope
 
-## 数据结构
+The public data was exported from model-ready six-dimensional feature data. It does not contain acquisition times, device or marker information, raw camera poses, force/torque data, local file paths, or original sample identifiers. Every public CSV contains only the 15 fields required to train, validate, and interpret the model.
 
-| 字段 | 含义 |
+## Data Schema
+
+| Field | Meaning |
 |---|---|
-| `dataset_label` | `boundary` 或 `interior` |
-| `pose_radius_mm` | 六维等效姿态半径 |
-| `q1_mm` … `q6_mm` | 六维等效姿态向量 |
-| `d1` … `d6` | 单位方向向量 `q / ||q||` |
-| `dataset_split` | `train`、`validation` 或 `test` |
+| `dataset_label` | `boundary` or `interior` |
+| `pose_radius_mm` | Six-dimensional equivalent-pose radius |
+| `q1_mm` … `q6_mm` | Six-dimensional equivalent-pose vector |
+| `d1` … `d6` | Unit direction vector `q / ||q||` |
+| `dataset_split` | `train`, `validation`, or `test` |
 
-六维等效姿态定义为：
+The six-dimensional equivalent pose is defined as:
 
 ```text
 q = [dx, dy, dz, 60*rx, 60*ry, 60*rz]
 ```
 
-其中平移单位为 mm，旋转量通过 `60 mm/rad` 转换为等效位移。
+Translations are measured in millimetres. Rotations are converted to equivalent displacements using `60 mm/rad`.
 
-固定数据划分为：
+The fixed data split is:
 
-| 集合 | 总数 | 边界点 | 内部点 |
+| Split | Total | Boundary | Interior |
 |---|---:|---:|---:|
-| 训练集 | 14,366 | 8,521 | 5,845 |
-| 验证集 | 4,788 | 2,840 | 1,948 |
-| 测试集 | 4,788 | 2,840 | 1,948 |
+| Training | 14,366 | 8,521 | 5,845 |
+| Validation | 4,788 | 2,840 | 1,948 |
+| Test | 4,788 | 2,840 | 1,948 |
 
-## 模型与损失函数
+## Model and Loss Functions
 
-网络结构为：
+The network architecture is:
 
 ```text
 6 -> 64 -> 64 -> 32 -> 1
 ```
 
-隐藏层使用 `tanh`，输出使用 `softplus + 1e-6 mm`，从而保证预测半径为正。
+The hidden layers use `tanh`. The output uses `softplus + 1e-6 mm` to ensure that the predicted radius is positive.
 
-边界点使用平方误差：
+Boundary samples use squared error:
 
 ```text
 0.5 * (predicted_radius - boundary_radius)^2
 ```
 
-内部点只在预测边界没有包住内部点及 1 mm 安全边距时产生惩罚：
+Interior samples are penalized only when the predicted boundary does not enclose the interior point plus the 1 mm safety margin:
 
 ```text
 0.5 * max(0, interior_radius + 1 mm - predicted_radius)^2
 ```
 
-## 安装与复现
+## Installation and Reproduction
 
-建议使用 Python 3.10 或更高版本：
+Python 3.10 or later is recommended:
 
 ```bash
 python3 -m venv .venv
@@ -64,57 +68,57 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
-## 数据采集 Demo
+## Data Collection Demos
 
-三个公开采集入口位于 `src/`，生成的原始文件默认写入 `data/raw/`。安装 RealSense 和 ArUco 采集依赖：
+The three public collection entry points are in `src/`. Generated raw files are written to `data/raw/` by default. Install the RealSense and ArUco collection dependencies with:
 
 ```bash
 python3 -m pip install -r requirements-collection.txt
 ```
 
-`opencv-contrib-python` 提供 ArUco 模块，`pyrealsense2` 提供 Intel RealSense Python 接口。力传感器驱动不随本仓库发布；需要真实机器人模式时，另行安装 [xArm Python SDK](https://github.com/xArm-Developer/xArm-Python-SDK)：
+`opencv-contrib-python` provides the ArUco module, and `pyrealsense2` provides the Intel RealSense Python interface. The force-sensor driver is not distributed with this repository. For real robot mode, install the [xArm Python SDK](https://github.com/xArm-Developer/xArm-Python-SDK) separately:
 
 ```bash
 python3 -m pip install xarm-python-sdk
 ```
 
-### 1. 手动姿态采集
+### 1. Manual Pose Collection
 
-只采集 RealSense/ArUco 姿态：
+To collect only RealSense/ArUco poses:
 
 ```bash
 python3 src/manual_base_measurement.py
 ```
 
-连接外部力传感器驱动时：
+To connect an external force-sensor driver:
 
 ```bash
 python3 src/manual_base_measurement.py \
   --force-sensor-python-dir /path/to/force-sensor-driver
 ```
 
-采集窗口按键为：`r` 标记零位参考、`i` 标记内部点、`b` 标记边界点、`u` 标记未知、`n` 开始新轨迹、`q` 或 `Esc` 结束。
+Collection-window keys: `r` marks the zero-pose reference, `i` marks an interior point, `b` marks a boundary point, `u` marks an unknown point, `n` starts a new trajectory, and `q` or `Esc` exits.
 
-### 2. 边界模型实时采集
+### 2. Live Boundary-Model Collection
 
-使用公开 NPZ 模型显示当前姿态与预测边界，并在网页中设置零位、标记边界或连续采样：
+Use the published NPZ model to display the current pose and predicted boundary. The web UI can set the zero pose, mark a boundary, or collect samples continuously:
 
 ```bash
 python3 src/boundary_model_live_ui.py \
   --model models/boundary_radius_nn_model.npz
 ```
 
-默认网页地址为 `http://127.0.0.1:8093`。
+The default web address is `http://127.0.0.1:8093`.
 
-### 3. 力反馈边界采集
+### 3. Force-Feedback Boundary Collection
 
-无硬件 mock 演示：
+Run the hardware-free mock demo with:
 
 ```bash
 python3 src/force_boundary_ui.py --mock
 ```
 
-默认网页地址为 `http://127.0.0.1:8765`。真实模式同时需要 RealSense、xArm 和外部力传感器驱动，并要求显式提供设备参数：
+The default web address is `http://127.0.0.1:8765`. Real mode requires RealSense, xArm, and an external force-sensor driver, and all device parameters must be supplied explicitly:
 
 ```bash
 python3 src/force_boundary_ui.py \
@@ -122,23 +126,23 @@ python3 src/force_boundary_ui.py \
   --force-sensor-python-dir /path/to/force-sensor-driver
 ```
 
-请先完成机器人运动安全评估，再启用真实运动控制。程序中的力和力矩限制不能替代硬件急停、限位与现场风险控制。
+Complete a robot-motion safety assessment before enabling real motion control. The software force and torque limits do not replace a hardware emergency stop, physical limits, or on-site risk controls.
 
-### 数据流与隐私
+### Data Flow and Privacy
 
 ```text
-采集 Demo -> data/raw -> 清洗与预处理 -> 固定公开数据集 -> 训练/验证
+Collection demos -> data/raw -> sanitization and preprocessing -> fixed public dataset -> training/validation
 ```
 
-`data/raw/` 中的 CSV 可能包含实验时间、设备或标记信息、原始相机姿态、机器人姿态以及力/力矩测量。该目录中的生成文件默认被 Git 忽略；公开任何原始文件前必须进行字段审查和脱敏。当前 `data/*.csv` 是已经清洗并固定划分的公开训练、验证和测试数据，不应直接用新采集文件覆盖。
+CSV files under `data/raw/` may contain experiment times, device or marker information, raw camera poses, robot poses, and force/torque measurements. Generated files in this directory are ignored by Git by default. Review and sanitize every raw file before publication. The current `data/*.csv` files are sanitized, fixed public training, validation, and test datasets; do not overwrite them directly with newly collected files.
 
-使用固定配置重新训练并生成模型和报告：
+Retrain the model and generate reports using the fixed configuration:
 
 ```bash
 python3 src/train_boundary_radius_nn_model.py
 ```
 
-显式写出完整配置时：
+To specify the full configuration explicitly:
 
 ```bash
 python3 src/train_boundary_radius_nn_model.py \
@@ -149,48 +153,48 @@ python3 src/train_boundary_radius_nn_model.py \
   --seed 7
 ```
 
-运行测试：
+Run the tests:
 
 ```bash
 python3 -m pytest -q tests
 ```
 
-无需重新训练即可核验公开模型与 JSON 报告中的全部指标是否一致：
+Verify all metrics in the published model and JSON report without retraining:
 
 ```bash
 python3 src/train_boundary_radius_nn_model.py --verify-only
 ```
 
-## 指标定义
+## Metric Definitions
 
-边界回归使用 MAE、RMSE 和绝对残差 P95。边界点是否正确按照发布模型的边界判定规则计算，对外统一报告为“边界准确率”。
+Boundary regression is reported with MAE, RMSE, and the 95th percentile of the absolute residual. Boundary samples are classified according to the published model's boundary rule and reported as “Boundary accuracy.”
 
-内部点正确表示预测边界能够包住内部点：
-
-```text
-预测边界 >= 内部点半径
-```
-
-整体准确率定义为：
+An interior point is correct when the predicted boundary encloses it:
 
 ```text
-(边界点正确数 + 被正确包住的内部点数) / 全部点数
+predicted_boundary >= interior_point_radius
 ```
 
-## 发布结果
+Overall accuracy is defined as:
 
-| 集合 | 边界 MAE | 边界 RMSE | 边界准确率 | 内部点 Inside 准确率 | 整体准确率 |
+```text
+(correct boundary points + correctly enclosed interior points) / all points
+```
+
+## Published Results
+
+| Split | Boundary MAE | Boundary RMSE | Boundary accuracy | Interior-point Inside accuracy | Overall accuracy |
 |---|---:|---:|---:|---:|---:|
-| 训练集 | 2.3332 mm | 3.1608 mm | 92.55% | 98.56% | 95.00% |
-| 验证集 | 2.3739 mm | 3.0277 mm | 91.48% | 98.87% | 94.49% |
-| 测试集 | 2.3587 mm | 3.1621 mm | 92.85% | 99.13% | 95.41% |
+| Training | 2.3332 mm | 3.1608 mm | 92.55% | 98.56% | 95.00% |
+| Validation | 2.3739 mm | 3.0277 mm | 91.48% | 98.87% | 94.49% |
+| Test | 2.3587 mm | 3.1621 mm | 92.85% | 99.13% | 95.41% |
 
-机器可读的完整指标位于 `reports/accuracy_report.json`，便于审计的 Markdown 报告位于 `reports/accuracy_report.md`。
+Complete machine-readable metrics are available in `reports/accuracy_report.json`. The auditable Markdown report is available in `reports/accuracy_report.md`.
 
-## 重要限制
+## Important Limitation
 
-当前采用按标签分层的行级随机划分，而不是按采集轨迹或批次分组。同一次连续采集中的相邻观测以及完全重复的特征/目标可能分布在不同集合，因此验证集和测试集结果可能偏乐观。评估对全新实验批次的泛化能力时，应增加按轨迹或批次分组的测试。
+The current dataset uses a row-level stratified random split rather than grouping by acquisition trajectory or batch. Adjacent observations from the same continuous acquisition, as well as exact duplicate feature/target observations, may appear in different splits. Validation and test metrics may therefore be optimistic. Add trajectory- or batch-grouped evaluation when measuring generalization to entirely new experimental batches.
 
-## 许可证
+## License
 
-本项目采用 [MIT License](LICENSE)。
+This project is licensed under the [MIT License](LICENSE).
