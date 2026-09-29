@@ -57,16 +57,24 @@ def test_public_markdown_uses_generic_boundary_accuracy_wording():
 
 
 @pytest.mark.parametrize(
+    "template",
+    ("{threshold} mm 边界准确率：92.85%", "边界准确率（{threshold} mm）：92.85%"),
+)
+@pytest.mark.parametrize("threshold", (1, 2, 3, 5))
+def test_generic_boundary_accuracy_wording_rejects_threshold_qualifiers(template, threshold):
+    with pytest.raises(AssertionError):
+        assert_generic_boundary_accuracy_wording(template.format(threshold=threshold))
+
+
+@pytest.mark.parametrize(
     "bad_text",
     (
-        "5 mm 边界准确率：92.85%",
-        "边界准确率（5 mm）：92.85%",
         "边界准确率：|预测半径 - 实际边界半径| <= 5 mm",
         "预测半径与实际边界半径之差不超过 5 mm",
         "边界准确率：误差 ≤ 5 mm",
     ),
 )
-def test_generic_boundary_accuracy_wording_rejects_threshold_variants(bad_text):
+def test_generic_boundary_accuracy_wording_rejects_formula_variants(bad_text):
     with pytest.raises(AssertionError):
         assert_generic_boundary_accuracy_wording(bad_text)
 
