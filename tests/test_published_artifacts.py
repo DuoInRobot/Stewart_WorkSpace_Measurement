@@ -4,6 +4,7 @@ import csv
 import importlib.util
 import json
 from pathlib import Path
+import re
 import sys
 
 import pytest
@@ -16,6 +17,13 @@ assert SPEC is not None and SPEC.loader is not None
 trainer = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = trainer
 SPEC.loader.exec_module(trainer)
+
+
+def assert_generic_boundary_accuracy_wording(text: str) -> None:
+    for line in text.splitlines():
+        if "边界准确率" in line:
+            assert re.search(r"(?:1|2|3|5)\s*mm", line, flags=re.IGNORECASE) is None
+    assert re.search(r"(?:<=|≤|不超过)\s*5\s*mm", text, flags=re.IGNORECASE) is None
 
 
 def test_published_model_reproduces_published_json_metrics():
@@ -42,9 +50,25 @@ def test_public_markdown_uses_generic_boundary_accuracy_wording():
 
     assert rendered == published
     assert "边界准确率" in rendered
+    assert_generic_boundary_accuracy_wording(rendered)
     assert "边界绝对误差：" not in rendered
     assert ("双侧 " + "5 mm 边界准确率") not in rendered
     assert ("双侧 " + "5 mm 内的边界点数") not in rendered
+
+
+@pytest.mark.parametrize(
+    "bad_text",
+    (
+        "5 mm 边界准确率：92.85%",
+        "边界准确率（5 mm）：92.85%",
+        "边界准确率：|预测半径 - 实际边界半径| <= 5 mm",
+        "预测半径与实际边界半径之差不超过 5 mm",
+        "边界准确率：误差 ≤ 5 mm",
+    ),
+)
+def test_generic_boundary_accuracy_wording_rejects_threshold_variants(bad_text):
+    with pytest.raises(AssertionError):
+        assert_generic_boundary_accuracy_wording(bad_text)
 
 
 def test_artifact_verification_rejects_changed_metrics(tmp_path):

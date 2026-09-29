@@ -117,3 +117,7 @@ def test_readme_documents_reproduction_metrics_and_split_limitation():
         assert ("双侧 " + "5 mm 边界准确率") not in text
         assert ("误差不超过 " + "1、2、5 mm 的比例") not in text
         assert "边界绝对误差：" not in text
+        for line in text.splitlines():
+            if "边界准确率" in line:
+                assert re.search(r"(?:1|2|3|5)\s*mm", line, flags=re.IGNORECASE) is None
+        assert re.search(r"(?:<=|≤|不超过)\s*5\s*mm", text, flags=re.IGNORECASE) is None
