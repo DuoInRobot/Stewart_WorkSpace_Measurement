@@ -6,3 +6,5 @@ venv/
 *.tmp
 *.rej
 .worktrees/
+data/raw/*.csv
+data/raw/*.json

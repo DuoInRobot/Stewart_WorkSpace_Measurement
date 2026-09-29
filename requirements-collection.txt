@@ -1,0 +1,3 @@
+-r requirements.txt
+opencv-contrib-python>=4.5,<6
+pyrealsense2>=2.50,<3
