@@ -191,9 +191,6 @@ Overall accuracy is defined as:
 
 Complete machine-readable metrics are available in `reports/accuracy_report.json`. The auditable Markdown report is available in `reports/accuracy_report.md`.
 
-## Important Limitation
-
-The current dataset uses a row-level stratified random split rather than grouping by acquisition trajectory or batch. Adjacent observations from the same continuous acquisition, as well as exact duplicate feature/target observations, may appear in different splits. Validation and test metrics may therefore be optimistic. Add trajectory- or batch-grouped evaluation when measuring generalization to entirely new experimental batches.
 
 ## License
 
