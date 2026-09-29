@@ -1,0 +1,184 @@
+{
+  "input_files": {
+    "dataset_csv": "data/boundary_radius_nn_dataset.csv"
+  },
+  "output_files": {
+    "model_npz": "models/boundary_radius_nn_model.npz",
+    "summary_json": "reports/accuracy_report.json",
+    "report_md": "reports/accuracy_report.md"
+  },
+  "nn_config": {
+    "hidden_sizes": [
+      64,
+      64,
+      32
+    ],
+    "seed": 7,
+    "min_radius_mm": 1e-06
+  },
+  "train_config": {
+    "epochs": 250,
+    "batch_size": 1024,
+    "learning_rate": 0.003,
+    "safety_margin_mm": 1.0
+  },
+  "training": {
+    "sample_count": 14366,
+    "boundary_count": 8521,
+    "interior_count": 5845,
+    "loss_history": [
+      {
+        "epoch": 1.0,
+        "loss": 549.9614561059589
+      },
+      {
+        "epoch": 50.0,
+        "loss": 18.978325535707196
+      },
+      {
+        "epoch": 100.0,
+        "loss": 5.22770541068043
+      },
+      {
+        "epoch": 150.0,
+        "loss": 3.6058046576307445
+      },
+      {
+        "epoch": 200.0,
+        "loss": 2.7919179603972837
+      },
+      {
+        "epoch": 250.0,
+        "loss": 2.569003553486382
+      }
+    ]
+  },
+  "split_counts": {
+    "train": {
+      "total": 14366,
+      "boundary": 8521,
+      "interior": 5845
+    },
+    "validation": {
+      "total": 4788,
+      "boundary": 2840,
+      "interior": 1948
+    },
+    "test": {
+      "total": 4788,
+      "boundary": 2840,
+      "interior": 1948
+    }
+  },
+  "metrics": {
+    "train": {
+      "counts": {
+        "total": 14366,
+        "boundary": 8521,
+        "interior": 5845
+      },
+      "mean_loss": 3.00602748309052,
+      "boundary": {
+        "sample_count": 8521,
+        "mae_mm": 2.3332302857332525,
+        "rmse_mm": 3.1607703858584686,
+        "residual_median_mm": -1.2163555225821412,
+        "residual_p95_abs_mm": 5.522337365192563,
+        "within_1mm_ratio": 0.27930994014787,
+        "within_2mm_ratio": 0.508977819504753,
+        "within_5mm_count": 7886,
+        "within_5mm_ratio": 0.9254782302546649,
+        "underestimated_more_than_5mm_count": 486,
+        "overestimated_count": 2785
+      },
+      "interior": {
+        "sample_count": 5845,
+        "inside_count": 5761,
+        "inside_ratio": 0.98562874251497,
+        "outside_count": 84,
+        "outside_ratio": 0.01437125748502994,
+        "safety_margin_satisfied_count": 5725,
+        "safety_margin_satisfied_ratio": 0.979469632164243,
+        "margin_min_mm": -10.70687803088284,
+        "margin_p05_mm": 3.7314590269942896,
+        "margin_median_mm": 17.222913126109013,
+        "margin_p95_mm": 38.943793646959044,
+        "margin_max_mm": 58.521449783387915
+      },
+      "combined_accuracy": 0.9499512738410135
+    },
+    "validation": {
+      "counts": {
+        "total": 4788,
+        "boundary": 2840,
+        "interior": 1948
+      },
+      "mean_loss": 2.749038121298067,
+      "boundary": {
+        "sample_count": 2840,
+        "mae_mm": 2.3739394516484276,
+        "rmse_mm": 3.0277378373319634,
+        "residual_median_mm": -1.4066096029459718,
+        "residual_p95_abs_mm": 5.620257680508146,
+        "within_1mm_ratio": 0.2679577464788732,
+        "within_2mm_ratio": 0.4880281690140845,
+        "within_5mm_count": 2598,
+        "within_5mm_ratio": 0.9147887323943662,
+        "underestimated_more_than_5mm_count": 193,
+        "overestimated_count": 896
+      },
+      "interior": {
+        "sample_count": 1948,
+        "inside_count": 1926,
+        "inside_ratio": 0.9887063655030801,
+        "outside_count": 22,
+        "outside_ratio": 0.011293634496919919,
+        "safety_margin_satisfied_count": 1913,
+        "safety_margin_satisfied_ratio": 0.9820328542094456,
+        "margin_min_mm": -8.421606093232299,
+        "margin_p05_mm": 3.359783534155672,
+        "margin_median_mm": 16.86571175354692,
+        "margin_p95_mm": 38.8368961530321,
+        "margin_max_mm": 58.7667845159602
+      },
+      "combined_accuracy": 0.9448621553884712
+    },
+    "test": {
+      "counts": {
+        "total": 4788,
+        "boundary": 2840,
+        "interior": 1948
+      },
+      "mean_loss": 3.000195514113837,
+      "boundary": {
+        "sample_count": 2840,
+        "mae_mm": 2.35872072718789,
+        "rmse_mm": 3.1621229201924237,
+        "residual_median_mm": -1.3359997691872572,
+        "residual_p95_abs_mm": 5.613180615152642,
+        "within_1mm_ratio": 0.2704225352112676,
+        "within_2mm_ratio": 0.4964788732394366,
+        "within_5mm_count": 2637,
+        "within_5mm_ratio": 0.9285211267605634,
+        "underestimated_more_than_5mm_count": 148,
+        "overestimated_count": 903
+      },
+      "interior": {
+        "sample_count": 1948,
+        "inside_count": 1931,
+        "inside_ratio": 0.9912731006160165,
+        "outside_count": 17,
+        "outside_ratio": 0.008726899383983572,
+        "safety_margin_satisfied_count": 1915,
+        "safety_margin_satisfied_ratio": 0.9830595482546202,
+        "margin_min_mm": -12.050030451605089,
+        "margin_p05_mm": 3.5638933941039026,
+        "margin_median_mm": 16.737331560804172,
+        "margin_p95_mm": 39.50614941185806,
+        "margin_max_mm": 58.249158624013425
+      },
+      "combined_accuracy": 0.9540517961570593
+    }
+  },
+  "limitation": "Row-level random splitting can place correlated or duplicate observations in different partitions."
+}
