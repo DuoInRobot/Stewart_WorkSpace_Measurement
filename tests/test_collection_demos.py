@@ -53,3 +53,14 @@ def test_manual_collector_keeps_training_compatible_labels_and_fields():
         assert state.operator_mode == label
     for field in ("operator_mode", "camera_in_marker_x_m", "force_x_n", "torque_z_nm"):
         assert field in module.CSV_FIELDS
+
+
+def test_live_boundary_ui_loads_published_npz_and_uses_raw_outputs():
+    module = load_source_module("boundary_model_live_ui")
+    assert module.DEFAULT_MODEL == REPOSITORY_ROOT / "models" / "boundary_radius_nn_model.npz"
+    assert module.DEFAULT_OUTSIDE_LOG.parent == REPOSITORY_ROOT / "data" / "raw"
+    assert module.DEFAULT_MANUAL_BOUNDARY_LOG.parent == REPOSITORY_ROOT / "data" / "raw"
+    model = module.load_boundary_model(module.DEFAULT_MODEL)
+    prediction = model.predict(np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+    assert prediction.radius_mm > 0.0
+    assert model.model_type == "nn"
