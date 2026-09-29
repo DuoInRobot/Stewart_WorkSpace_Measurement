@@ -812,7 +812,7 @@ async function refresh() {
   const data = await res.json();
   const status = document.getElementById('status');
   status.className = 'status ' + data.status;
-  status.textContent = data.status;
+  status.textContent = data.camera_error ? 'camera error: ' + data.camera_error : data.status;
   const rel = data.relative || {};
   const cam = data.camera_in_marker || {};
   const manualLog = data.manual_boundary_logging || {};

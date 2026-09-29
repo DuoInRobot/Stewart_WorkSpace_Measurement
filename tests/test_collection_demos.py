@@ -202,6 +202,10 @@ def test_boundary_camera_capture_error_is_visible_in_status(monkeypatch):
     poller.stop()
 
     assert state.status_payload()["camera_error"] == "camera disconnected"
+    assert (
+        "status.textContent = data.camera_error ? 'camera error: ' + data.camera_error : data.status;"
+        in module.INDEX_HTML
+    )
 
 
 def test_boundary_ui_binds_server_before_starting_camera(monkeypatch, tmp_path):
@@ -267,3 +271,98 @@ def test_force_ui_binds_server_before_starting_source(monkeypatch, tmp_path):
     with pytest.raises(OSError, match="port unavailable"):
         module.main()
     assert starts == []
+
+
+@pytest.mark.parametrize("failure_point", ["start", "serve"])
+def test_boundary_ui_cleans_resources_when_startup_or_serving_fails(
+    monkeypatch,
+    tmp_path,
+    failure_point,
+):
+    module = load_source_module("boundary_model_live_ui")
+    events = []
+
+    class FakePoller:
+        def __init__(self, **_kwargs):
+            pass
+
+        def start(self):
+            events.append("start")
+            if failure_point == "start":
+                raise RuntimeError("startup failed")
+
+        def stop(self):
+            events.append("stop")
+
+    class FakeServer:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def serve_forever(self):
+            events.append("serve")
+            raise RuntimeError("serve failed")
+
+        def server_close(self):
+            events.append("close")
+
+    monkeypatch.setattr(module, "CameraPoller", FakePoller)
+    monkeypatch.setattr(module, "ThreadingHTTPServer", FakeServer)
+    args = module.build_arg_parser().parse_args(
+        [
+            "--outside-log", str(tmp_path / "outside.csv"),
+            "--manual-boundary-log", str(tmp_path / "manual.csv"),
+        ]
+    )
+
+    with pytest.raises(RuntimeError, match=f"{failure_point}.*failed"):
+        module.run_live_ui(args)
+    assert events[-2:] == ["close", "stop"]
+
+
+@pytest.mark.parametrize("failure_point", ["start", "serve"])
+def test_force_ui_cleans_resources_when_startup_or_serving_fails(
+    monkeypatch,
+    tmp_path,
+    failure_point,
+):
+    module = load_source_module("force_boundary_ui")
+    events = []
+
+    class FakePoller:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def start(self):
+            events.append("start")
+            if failure_point == "start":
+                raise RuntimeError("startup failed")
+
+        def stop(self):
+            events.append("stop")
+
+    class FakeServer:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def serve_forever(self):
+            events.append("serve")
+            raise RuntimeError("serve failed")
+
+        def server_close(self):
+            events.append("close")
+
+    real_build_arg_parser = module.build_arg_parser
+
+    class FakeParser:
+        def parse_args(self):
+            return real_build_arg_parser().parse_args(
+                ["--mock", "--output", str(tmp_path / "marks.csv")]
+            )
+
+    monkeypatch.setattr(module, "SamplePoller", FakePoller)
+    monkeypatch.setattr(module, "ThreadingHTTPServer", FakeServer)
+    monkeypatch.setattr(module, "build_arg_parser", lambda: FakeParser())
+
+    with pytest.raises(RuntimeError, match=f"{failure_point}.*failed"):
+        module.main()
+    assert events[-2:] == ["close", "stop"]
